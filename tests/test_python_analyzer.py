@@ -79,9 +79,12 @@ class TestClass:
         filepath.write_text(content)
 
     def tearDown(self):
-        for file in self.test_dir.glob("*.py"):
-            file.unlink()
-        self.test_dir.rmdir()
+        # Clean up all files and subdirectories recursively
+        if self.test_dir.exists():
+            for file in self.test_dir.glob("**/*"):
+                if file.is_file():
+                    file.unlink()
+            self.test_dir.rmdir()
 
 
 if __name__ == "__main__":

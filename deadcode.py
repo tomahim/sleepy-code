@@ -354,18 +354,20 @@ class PythonAnalyzer(CodeAnalyzer):
 
     def analyze_file_content(self, content, filepath):
         elements = {}
+        used_elements = set()
         filename = os.path.basename(filepath).replace(".py", "")
+
         try:
             tree = ast.parse(content)
 
-            # First collect all functions
+            # First collect all functions and methods
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef):
+                    # Standalone functions
                     if not any(
                         isinstance(parent, ast.ClassDef)
-                        and hasattr(parent, "body")
-                        and node in parent.body
                         for parent in ast.walk(tree)
+                        if hasattr(parent, "body") and node in parent.body
                     ):
                         full_name = f"{filename}::{node.name}"
                         elements[full_name] = {
@@ -385,21 +387,27 @@ class PythonAnalyzer(CodeAnalyzer):
                                 "type": "method",
                             }
 
-            # Then check usage within the same file
+            # Then collect all function calls
             for node in ast.walk(tree):
                 if isinstance(node, ast.Call):
                     if isinstance(node.func, ast.Name):
                         used_name = f"{filename}::{node.func.id}"
                         if used_name in elements:
-                            elements.pop(used_name)
+                            used_elements.add(used_name)
                     elif isinstance(node.func, ast.Attribute):
                         if (
                             isinstance(node.func.value, ast.Name)
                             and node.func.value.id == "self"
                         ):
-                            for key in list(elements.keys()):
-                                if key.endswith(f"::{node.func.attr}"):
-                                    elements.pop(key)
+                            class_method_name = node.func.attr
+                            for key in elements:
+                                if key.endswith(f"::{class_method_name}"):
+                                    used_elements.add(key)
+
+            # Remove used elements from results
+            for used in used_elements:
+                if used in elements:
+                    elements.pop(used)
 
         except SyntaxError:
             print(f"Syntax error in file: {filepath}")
@@ -416,33 +424,18 @@ class PythonAnalyzer(CodeAnalyzer):
 
         try:
             tree = ast.parse(content)
-            imports = {}
-            name_parts = element_info["name"].split("::")
-
-            # Collect imports in this file
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Import):
-                    for name in node.names:
-                        imports[name.asname or name.name] = name.name
-                elif isinstance(node, ast.ImportFrom):
-                    for name in node.names:
-                        imports[name.asname or name.name] = f"{node.module}.{name.name}"
-
             for node in ast.walk(tree):
                 if isinstance(node, ast.Call):
                     if isinstance(node.func, ast.Name):
-                        # Check direct calls and imported function calls
-                        if node.func.id == name_parts[-1] or node.func.id in imports:
+                        name_parts = element_info["name"].split("::")
+                        if node.func.id == name_parts[-1]:
                             return element_info["name"]
                     elif isinstance(node.func, ast.Attribute):
-                        # Check method calls including through imports
-                        if len(name_parts) > 2:  # Class method
+                        if "::" in element_info["name"]:
+                            name_parts = element_info["name"].split("::")
                             if (
                                 isinstance(node.func.value, ast.Name)
-                                and (
-                                    node.func.value.id == "self"
-                                    or node.func.value.id in imports
-                                )
+                                and node.func.value.id == "self"
                                 and node.func.attr == name_parts[-1]
                             ):
                                 return element_info["name"]
