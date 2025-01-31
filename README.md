@@ -19,7 +19,7 @@
 ### Setup Virtual Environment & requirements
 
 ```bash
-python -m venv venv
+python -m venv venv --without-pip
 source venv/bin/activate  # On Windows use: venv\Scripts\activate
 pip install -r requirements.txt
 ```

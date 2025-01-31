@@ -155,7 +155,11 @@ class CodeAnalyzer(ABC):
                 for filepath in all_files:
                     if limit and len(elements) - len(self.found_usage) <= limit:
                         break
-                    remaining = [e for name, e in elements.items() if name not in self.found_usage]
+                    remaining = [
+                        e
+                        for name, e in elements.items()
+                        if name not in self.found_usage
+                    ]
                     results = pool.map(partial(self.check_usage, filepath), remaining)
                     self.found_usage.extend([r for r in results if r])
                     pbar.update(1)
@@ -199,9 +203,13 @@ class PhpAnalyzer(CodeAnalyzer):
         for root, _, filenames in os.walk(self.directory):
             for filename in filenames:
                 if filename.endswith(".php"):
-                    if "vendor" not in root.split(os.sep) and "cache" not in root.split(os.sep):
+                    if "vendor" not in root.split(os.sep) and "cache" not in root.split(
+                        os.sep
+                    ):
                         filepath = os.path.join(root, filename)
-                        is_test = "test" in root.lower() or filename.endswith("Test.php")
+                        is_test = "test" in root.lower() or filename.endswith(
+                            "Test.php"
+                        )
                         if for_analysis != is_test:
                             files.append(filepath)
         return files
@@ -227,8 +235,13 @@ class PhpAnalyzer(CodeAnalyzer):
                 implements_pattern = rf"class\s+{class_name}\s+implements\s+([\w\s,]+)"
                 implements_match = re.search(implements_pattern, content)
                 if implements_match:
-                    interfaces = [i.strip() for i in implements_match.group(1).split(",")]
-                    if any(self.is_interface_method(func_name, interface, content) for interface in interfaces):
+                    interfaces = [
+                        i.strip() for i in implements_match.group(1).split(",")
+                    ]
+                    if any(
+                        self.is_interface_method(func_name, interface, content)
+                        for interface in interfaces
+                    ):
                         continue
 
             full_name = f"{class_name}::{func_name}" if class_name else func_name
@@ -236,7 +249,10 @@ class PhpAnalyzer(CodeAnalyzer):
             if full_name not in elements:
                 status = (
                     "potential false positive"
-                    if any(pattern in full_name for pattern in self.POTENTIAL_FALSE_POSITIVE_PATTERNS)
+                    if any(
+                        pattern in full_name
+                        for pattern in self.POTENTIAL_FALSE_POSITIVE_PATTERNS
+                    )
                     else ""
                 )
                 elements[full_name] = {
@@ -289,9 +305,7 @@ class PhpAnalyzer(CodeAnalyzer):
         content_before = content[:position]
         content_before = re.sub(r"/\*.*?\*/", "", content_before, flags=re.DOTALL)
         content_before = re.sub(r"//.*?\n", "", content_before)
-        class_pattern = (
-            r"(?:class|interface|abstract\s+class|trait|enum)\s+(\w+)(?:\s*:\s*\w+|\s+extends|\s+implements|\s*\{)"
-        )
+        class_pattern = r"(?:class|interface|abstract\s+class|trait|enum)\s+(\w+)(?:\s*:\s*\w+|\s+extends|\s+implements|\s*\{)"
         class_matches = list(re.finditer(class_pattern, content_before))
         return class_matches[-1].group(1) if class_matches else None
 
@@ -325,10 +339,14 @@ class PythonAnalyzer(CodeAnalyzer):
         for root, _, filenames in os.walk(self.directory):
             for filename in filenames:
                 if filename.endswith(".py"):
-                    if "venv" not in root.split(os.sep) and "__pycache__" not in root.split(os.sep):
+                    if "venv" not in root.split(
+                        os.sep
+                    ) and "__pycache__" not in root.split(os.sep):
                         filepath = os.path.join(root, filename)
                         is_test = (
-                            "test" in root.lower() or filename.startswith("test_") or filename.endswith("_test.py")
+                            "test" in root.lower()
+                            or filename.startswith("test_")
+                            or filename.endswith("_test.py")
                         )
                         if for_analysis != is_test:
                             files.append(filepath)
@@ -336,58 +354,102 @@ class PythonAnalyzer(CodeAnalyzer):
 
     def analyze_file_content(self, content, filepath):
         elements = {}
+        filename = os.path.basename(filepath).replace(".py", "")
         try:
             tree = ast.parse(content)
-            for node in ast.walk(tree):
-                if isinstance(node, ast.ClassDef):
-                    # Get base classes
-                    bases = [base.id for base in node.bases if isinstance(base, ast.Name)]
 
+            # First collect all functions
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    if not any(
+                        isinstance(parent, ast.ClassDef)
+                        and hasattr(parent, "body")
+                        and node in parent.body
+                        for parent in ast.walk(tree)
+                    ):
+                        full_name = f"{filename}::{node.name}"
+                        elements[full_name] = {
+                            "name": full_name,
+                            "base_name": node.name,
+                            "lines": node.end_lineno - node.lineno + 1,
+                            "type": "function",
+                        }
+                elif isinstance(node, ast.ClassDef):
                     for item in node.body:
                         if isinstance(item, ast.FunctionDef):
-                            # Skip if method exists in any base class
-                            if any(hasattr(globals().get(base, None), item.name) for base in bases):
-                                continue
-
-                            full_name = f"{node.name}::{item.name}"
-                            status = (
-                                "potential false positive"
-                                if any(pattern in full_name for pattern in self.POTENTIAL_FALSE_POSITIVE_PATTERNS)
-                                else ""
-                            )
+                            full_name = f"{filename}::{node.name}::{item.name}"
                             elements[full_name] = {
                                 "name": full_name,
+                                "base_name": item.name,
                                 "lines": item.end_lineno - item.lineno + 1,
                                 "type": "method",
-                                "status": status,
                             }
+
+            # Then check usage within the same file
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call):
+                    if isinstance(node.func, ast.Name):
+                        used_name = f"{filename}::{node.func.id}"
+                        if used_name in elements:
+                            elements.pop(used_name)
+                    elif isinstance(node.func, ast.Attribute):
+                        if (
+                            isinstance(node.func.value, ast.Name)
+                            and node.func.value.id == "self"
+                        ):
+                            for key in list(elements.keys()):
+                                if key.endswith(f"::{node.func.attr}"):
+                                    elements.pop(key)
+
         except SyntaxError:
             print(f"Syntax error in file: {filepath}")
+
         return elements
 
     def check_usage(self, filepath, element_info):
         if element_info["name"] in self.found_usage:
-            return
+            return None
 
         content = self.read_file(filepath)
         if not content:
-            return
+            return None
 
         try:
             tree = ast.parse(content)
+            imports = {}
+            name_parts = element_info["name"].split("::")
+
+            # Collect imports in this file
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for name in node.names:
+                        imports[name.asname or name.name] = name.name
+                elif isinstance(node, ast.ImportFrom):
+                    for name in node.names:
+                        imports[name.asname or name.name] = f"{node.module}.{name.name}"
+
             for node in ast.walk(tree):
                 if isinstance(node, ast.Call):
-                    if isinstance(node.func, ast.Name) and node.func.id == element_info["name"]:
-                        self.found_usage.append(element_info["name"])
-                        break
+                    if isinstance(node.func, ast.Name):
+                        # Check direct calls and imported function calls
+                        if node.func.id == name_parts[-1] or node.func.id in imports:
+                            return element_info["name"]
                     elif isinstance(node.func, ast.Attribute):
-                        if element_info["type"] == "method":
-                            class_name, method_name = element_info["name"].split("::")
-                            if node.func.attr == method_name:
-                                self.found_usage.append(element_info["name"])
-                                break
+                        # Check method calls including through imports
+                        if len(name_parts) > 2:  # Class method
+                            if (
+                                isinstance(node.func.value, ast.Name)
+                                and (
+                                    node.func.value.id == "self"
+                                    or node.func.value.id in imports
+                                )
+                                and node.func.attr == name_parts[-1]
+                            ):
+                                return element_info["name"]
         except SyntaxError:
             pass
+
+        return None
 
 
 def main():
@@ -395,7 +457,11 @@ def main():
     parser.add_argument("directory", help="Directory path containing source files")
     parser.add_argument("--language", choices=["php", "python"], required=True)
     parser.add_argument("--limit", type=int, help="Limit the number of results")
-    parser.add_argument("--list-functions", action="store_true", help="List functions sorted by line count")
+    parser.add_argument(
+        "--list-functions",
+        action="store_true",
+        help="List functions sorted by line count",
+    )
 
     args = parser.parse_args()
 
@@ -403,7 +469,11 @@ def main():
         print(f"Error: {args.directory} is not a valid directory")
         sys.exit(1)
 
-    analyzer = PhpAnalyzer(args.directory) if args.language == "php" else PythonAnalyzer(args.directory)
+    analyzer = (
+        PhpAnalyzer(args.directory)
+        if args.language == "php"
+        else PythonAnalyzer(args.directory)
+    )
 
     if args.list_functions:
         elements = {}

@@ -1,0 +1,4 @@
+venv
+sites-packages
+*.html
+__pycache__
