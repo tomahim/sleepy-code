@@ -24,7 +24,7 @@ source venv/bin/activate  # On Windows use: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## 💻 Usage Examples
+### 💻 Usage Examples
 
 Analyze PHP codebase:
 
@@ -38,7 +38,7 @@ List all functions sorted by line count:
 
 python deadcode.py /path/to/project --language php --list-functions
 
-## 📊 Reports
+### 📊 Reports
 
 The tool generates an interactive HTML report:
 
