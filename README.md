@@ -28,15 +28,15 @@ pip install -r requirements.txt
 
 Analyze PHP codebase:
 
-python deadcode.py /path/to/php/project --language php
+`python deadcode.py /path/to/php/project --language php`
 
 Analyze Python codebase with result limit:
 
-python deadcode.py /path/to/python/project --language python --limit 50
+`python deadcode.py /path/to/python/project --language python --limit 50`
 
 List all functions sorted by line count:
 
-python deadcode.py /path/to/project --language php --list-functions
+`python deadcode.py /path/to/project --language php --list-functions`
 
 ### 📊 Reports
 
@@ -46,11 +46,13 @@ Sort by name, lines, or usage count
 Toggle visibility of potential false positives
 Search and filter results
 Paginated results for easy navigation
+
 Reports are generated as:
 
-code_analysis_php.html for PHP analysis
-code_analysis_python.html for Python analysis
-🎨 Report Colors
-🔴 Red: Unused functions
-🟠 Orange: Potential false positives
-🟣 Purple: Static attributes
+- code_analysis_php.html for PHP analysis
+- code_analysis_python.html for Python analysis
+
+- 🎨 Report Colors
+- 🔴 Red: Unused functions
+- 🟠 Orange: Potential false positives
+- 🟣 Purple: Static attributes
