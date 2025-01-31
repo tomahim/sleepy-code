@@ -354,21 +354,25 @@ class PythonAnalyzer(CodeAnalyzer):
 
     def analyze_file_content(self, content, filepath):
         elements = {}
-        used_elements = set()
         filename = os.path.basename(filepath).replace(".py", "")
-
         try:
             tree = ast.parse(content)
 
             # First collect all functions and methods
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef):
-                    # Standalone functions
-                    if not any(
-                        isinstance(parent, ast.ClassDef)
-                        for parent in ast.walk(tree)
-                        if hasattr(parent, "body") and node in parent.body
-                    ):
+                    # Check if function is inside a class
+                    is_method = False
+                    for potential_parent in ast.walk(tree):
+                        if isinstance(potential_parent, ast.ClassDef):
+                            if any(
+                                isinstance(n, ast.FunctionDef) and n.name == node.name
+                                for n in potential_parent.body
+                            ):
+                                is_method = True
+                                break
+
+                    if not is_method:
                         full_name = f"{filename}::{node.name}"
                         elements[full_name] = {
                             "name": full_name,
@@ -393,21 +397,16 @@ class PythonAnalyzer(CodeAnalyzer):
                     if isinstance(node.func, ast.Name):
                         used_name = f"{filename}::{node.func.id}"
                         if used_name in elements:
-                            used_elements.add(used_name)
+                            elements.pop(used_name)
                     elif isinstance(node.func, ast.Attribute):
                         if (
                             isinstance(node.func.value, ast.Name)
                             and node.func.value.id == "self"
                         ):
                             class_method_name = node.func.attr
-                            for key in elements:
+                            for key in list(elements.keys()):
                                 if key.endswith(f"::{class_method_name}"):
-                                    used_elements.add(key)
-
-            # Remove used elements from results
-            for used in used_elements:
-                if used in elements:
-                    elements.pop(used)
+                                    elements.pop(key)
 
         except SyntaxError:
             print(f"Syntax error in file: {filepath}")
