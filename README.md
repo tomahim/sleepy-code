@@ -14,6 +14,12 @@
 - 🔄 Multi-processing for fast analysis
 - 🐍 Supports both PHP and Python codebases
 
+## 🎯 TODO
+
+- [ ] Add support for TS
+- [ ] Detect unused classes
+- [ ] Detect unused variables and imports
+
 ## 🚀 Getting Started
 
 ### Setup Virtual Environment & requirements
