@@ -38,6 +38,13 @@ List all functions sorted by line count:
 
 `python deadcode.py /path/to/project --language php --list-functions`
 
+## 🧪 Testing
+
+Run the test suite:
+```bash
+python -m unittest tests/test_python_analyzer.py
+```
+
 ### 📊 Reports
 
 The tool generates an interactive HTML report:
