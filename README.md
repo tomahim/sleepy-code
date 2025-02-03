@@ -17,7 +17,7 @@
 ## 🎯 TODO
 
 - [ ] Add support for TS
-- [ ] Detect unused classes
+- [ ] Detect unused classes (make them displayed in a new tab in the report)
 - [ ] Detect unused variables and imports
 
 ## 🚀 Getting Started
