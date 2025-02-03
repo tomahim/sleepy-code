@@ -287,7 +287,7 @@ class PhpAnalyzer(CodeAnalyzer):
                 rf"\$this->{element_info['base_name']}\s*\(",
                 rf"self::{element_info['base_name']}\s*\(",
                 rf"static::{element_info['base_name']}\s*\(",
-            ]
+            ] 
         else:  # static attribute
             patterns = [
                 rf"{element_info['class_name']}::\${element_info['base_name']}",
@@ -332,6 +332,13 @@ class PythonAnalyzer(CodeAnalyzer):
         "test_",
         "setup",
         "teardown",
+        "__str__",
+        "__call__",
+        "__repr__",
+        "__init__",
+        "__post_init__",
+        "__getitem__",
+        "before_sentry_send"
     ]
 
     def get_files(self, for_analysis=True):
@@ -355,63 +362,111 @@ class PythonAnalyzer(CodeAnalyzer):
     def analyze_file_content(self, content, filepath):
         elements = {}
         filename = os.path.basename(filepath).replace(".py", "")
-        try:
-            tree = ast.parse(content)
 
-            # First collect all functions and methods
-            for node in ast.walk(tree):
-                if isinstance(node, ast.FunctionDef):
-                    # Check if function is inside a class
-                    is_method = False
-                    for potential_parent in ast.walk(tree):
-                        if isinstance(potential_parent, ast.ClassDef):
-                            if any(
-                                isinstance(n, ast.FunctionDef) and n.name == node.name
-                                for n in potential_parent.body
-                            ):
-                                is_method = True
-                                break
+        # Find all decorators and their function names
+        decorator_pattern = r'@(\w+(?:\.\w+)*)(?:\s*\([^)]*(?:"[^"]*"[^)]*)*\))?\s*\n\s*(?:@[^\n]+\n\s*)*(?:async\s+)?def\s+(\w+)\s*\('
+        decorated_functions = {}
+        property_functions = {}  # Store both function name and match position
 
-                    if not is_method:
-                        full_name = f"{filename}::{node.name}"
-                        elements[full_name] = {
-                            "name": full_name,
-                            "base_name": node.name,
-                            "lines": node.end_lineno - node.lineno + 1,
-                            "type": "function",
-                        }
-                elif isinstance(node, ast.ClassDef):
-                    for item in node.body:
-                        if isinstance(item, ast.FunctionDef):
-                            full_name = f"{filename}::{node.name}::{item.name}"
-                            elements[full_name] = {
-                                "name": full_name,
-                                "base_name": item.name,
-                                "lines": item.end_lineno - item.lineno + 1,
-                                "type": "method",
-                            }
+        for match in re.finditer(decorator_pattern, content):
+            decorator_name, func_name = match.groups()
+            if func_name not in decorated_functions:
+                decorated_functions[func_name] = []
+            decorated_functions[func_name].append(decorator_name)
+            
+            # Track property decorated functions with their position
+            if decorator_name in ('property', 'cached_property'):
+                property_functions[func_name] = match.start()
 
-            # Then collect all function calls
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Call):
-                    if isinstance(node.func, ast.Name):
-                        used_name = f"{filename}::{node.func.id}"
-                        if used_name in elements:
-                            elements.pop(used_name)
-                    elif isinstance(node.func, ast.Attribute):
-                        if (
-                            isinstance(node.func.value, ast.Name)
-                            and node.func.value.id == "self"
-                        ):
-                            class_method_name = node.func.attr
-                            for key in list(elements.keys()):
-                                if key.endswith(f"::{class_method_name}"):
-                                    elements.pop(key)
+        # Process properties
+        for func_name, pos in property_functions.items():
+            # Skip if function has validator decorator
+            if any('validator' in d.lower() for d in decorated_functions[func_name]):
+                continue
+                
+            class_name = self.find_class_name(content, pos)
+            if class_name:
+                full_name = f"{filename}::{class_name}::{func_name}"
+                if full_name not in elements:
+                    status = "potential false positive" if any(pattern in full_name for pattern in self.POTENTIAL_FALSE_POSITIVE_PATTERNS) else ""
+                    elements[full_name] = {
+                        "name": full_name,
+                        "lines": self.count_function_lines(content, pos),
+                        "base_name": func_name,
+                        "class_name": class_name,
+                        "type": "property",
+                        "status": status
+                    }
 
-        except SyntaxError:
-            print(f"Syntax error in file: {filepath}")
+        # Find regular functions/methods
+        function_pattern = r"(?:async\s+)?def\s+(\w+)\s*\("
+        for match in re.finditer(function_pattern, content):
+            func_name = match.group(1)
+            
+            # Skip if function has validator decorator or is already processed as property
+            if (func_name in decorated_functions and any('validator' in d.lower() for d in decorated_functions[func_name])) or \
+            func_name in property_functions:
+                continue
+                
+            class_name = self.find_class_name(content, match.start())
+            full_name = f"{filename}::{class_name}::{func_name}" if class_name else f"{filename}::{func_name}"
+
+            if full_name not in elements:
+                status = "potential false positive" if any(pattern in full_name for pattern in self.POTENTIAL_FALSE_POSITIVE_PATTERNS) else ""
+                elements[full_name] = {
+                    "name": full_name,
+                    "lines": self.count_function_lines(content, match.end()),
+                    "base_name": func_name,
+                    "class_name": class_name,
+                    "type": "method" if class_name else "function",
+                    "status": status
+                }
 
         return elements
+
+    def _get_patterns(self, element_info, is_same_file):
+        """Get regex patterns for usage detection based on element type."""
+        name_parts = element_info["name"].split("::")
+        current_file = name_parts[0]
+        func_name = name_parts[-1]
+        
+        base_patterns = {
+            "property": [
+                rf"self\.{func_name}\b(?!\s*\()",
+                rf"\w+\.{func_name}\b(?!\s*\()",
+                rf"super\(\)\.{func_name}\b(?!\s*\()",
+                rf"\b{func_name}\b(?!\s*\()"  # Direct reference
+            ],
+            "method": [
+                rf"self\.{func_name}\s*\(",
+                rf"\w+\.{func_name}\s*\(",
+                rf"super\(\)\.{func_name}\s*\(",
+                rf"(?<!def\s)\b{func_name}\s*\("  # Direct reference
+            ],
+            "function": [
+                rf"(?<!def\s)(?<!\.)\b{func_name}\s*\(",  # Simple function call
+                rf"=\s*{func_name}\s*\(",
+                rf"return\s+{func_name}\s*\(",
+                rf"[,(]\s*{func_name}\s*\(",
+                rf"\w+\([^)]*{func_name}[^)]*\)",  # Function as argument in any position
+                rf"\w+\.{func_name}\s*\("  # Method-style call through variable
+            ]
+        }
+
+        import_patterns = {
+            "property": [rf"from\s+{current_file}\s+import\s+{func_name}"],
+            "method": [rf"from\s+{current_file}\s+import\s+{func_name}"],
+            "function": [
+                rf"from\s+{current_file}\s+import\s+{func_name}",
+                rf"import\s+{current_file}\.{func_name}"
+            ]
+        }
+
+        patterns = base_patterns[element_info["type"]]
+        if not is_same_file:
+            patterns.extend(import_patterns[element_info["type"]])
+        
+        return patterns
 
     def check_usage(self, filepath, element_info):
         if element_info["name"] in self.found_usage:
@@ -421,27 +476,60 @@ class PythonAnalyzer(CodeAnalyzer):
         if not content:
             return None
 
-        try:
-            tree = ast.parse(content)
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Call):
-                    if isinstance(node.func, ast.Name):
-                        name_parts = element_info["name"].split("::")
-                        if node.func.id == name_parts[-1]:
-                            return element_info["name"]
-                    elif isinstance(node.func, ast.Attribute):
-                        if "::" in element_info["name"]:
-                            name_parts = element_info["name"].split("::")
-                            if (
-                                isinstance(node.func.value, ast.Name)
-                                and node.func.value.id == "self"
-                                and node.func.attr == name_parts[-1]
-                            ):
-                                return element_info["name"]
-        except SyntaxError:
-            pass
+        name_parts = element_info["name"].split("::")
+        current_file_path = os.path.basename(filepath).replace(".py", "")
+        is_same_file = name_parts[0] == current_file_path
 
+        patterns = self._get_patterns(element_info, is_same_file)
+        total_usage = sum(len(re.findall(pattern, content)) for pattern in patterns)
+
+        if total_usage > 0:
+            return element_info["name"]
         return None
+
+    def find_class_name(self, content, position):
+        content_before = content[:position]
+        lines = content_before.split('\n')
+        
+        # Get indentation level of the function
+        func_line_no = content_before.count('\n')
+        func_indent = len(lines[-1]) - len(lines[-1].lstrip())
+        
+        # Find all class definitions
+        class_pattern = r"^(\s*)class\s+(\w+)(?:\s*\([\w\s,]*\))?\s*:"
+        class_matches = []
+        
+        for i, line in enumerate(lines):
+            match = re.match(class_pattern, line)
+            if match:
+                indent = len(match.group(1))
+                class_name = match.group(2)
+                class_matches.append((i, indent, class_name))
+        
+        # Find the innermost class that contains our function
+        current_class = None
+        for line_no, indent, class_name in class_matches:
+            if line_no < func_line_no and indent < func_indent:
+                current_class = class_name
+                
+        return current_class
+
+    def count_function_lines(self, content, start_pos):
+        bracket_count = 0
+        line_count = 1
+        pos = start_pos
+
+        while pos < len(content):
+            if content[pos] == "{" or content[pos] == ":":
+                bracket_count += 1
+            elif content[pos] == "}" or (content[pos] == "\n" and content[pos-1] == "\n"):
+                bracket_count -= 1
+                if bracket_count == 0:
+                    return line_count
+            elif content[pos] == "\n":
+                line_count += 1
+            pos += 1
+        return line_count
 
 
 def main():
