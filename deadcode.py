@@ -338,7 +338,9 @@ class PythonAnalyzer(CodeAnalyzer):
         "__init__",
         "__post_init__",
         "__getitem__",
-        "before_sentry_send"
+        "before_sentry_send",
+        "__get_pydantic_core_schema__",
+        "custom_exception_handler"
     ]
 
     def get_files(self, for_analysis=True):
@@ -445,11 +447,11 @@ class PythonAnalyzer(CodeAnalyzer):
             ],
             "function": [
                 rf"(?<!def\s)(?<!\.)\b{func_name}\s*\(",  # Simple function call
-                rf"=\s*{func_name}\s*\(",
-                rf"return\s+{func_name}\s*\(",
-                rf"[,(]\s*{func_name}\s*\(",
-                rf"\w+\([^)]*{func_name}[^)]*\)",  # Function as argument in any position
-                rf"\w+\.{func_name}\s*\("  # Method-style call through variable
+                rf"=\s*{func_name}\b",  # Assignment without call
+                rf"return\s+{func_name}\b",  # Return statement with or without call
+                rf"\w+\.{func_name}\s*\(",  # Method-style call through variable
+                rf"\w+\([^,]*{func_name}(?:\s*\)|,)",  # First argument
+                rf"\w+\([^,]+,\s*{func_name}(?:\s*\)|,)"  # Subsequent arguments
             ]
         }
 

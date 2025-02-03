@@ -164,6 +164,31 @@ class TestClass:
         self.assertNotIn("test::MyClass::suffix", elements)
         self.assertIn("test::MyClass::normal_method", elements)
 
+    def test_function_reference_usage(self):
+            content = '''
+        def used_function():
+            return 42
+
+        def other_function():
+            # Return function reference without calling it
+            return used_function
+
+        def another_function():
+            # Assign function reference
+            func = used_function
+            return func
+        '''
+            filepath = os.path.join(self.test_dir, "test.py")
+            self._write_test_file("test.py", content)
+            analyzer = PythonAnalyzer(self.test_dir)
+            
+            result = analyzer.check_usage(filepath, {
+                "name": "test::used_function",
+                "type": "function",
+                "base_name": "used_function"
+            })
+            self.assertIsNotNone(result)  # Should detect usage as function reference
+
     def test_nested_function_usage(self):
         content = """
     def outer_function():
