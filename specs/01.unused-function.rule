@@ -1,0 +1,51 @@
+### Description
+
+
+
+### File1.php
+
+class File1 {
+    public function publicUnusedFunction() {
+    }
+
+    private function privateUnusedFunction() {
+    }
+
+    public function functionUsingFile2ButNotUsedItself() {
+        $file2 = new File2();
+        $file2->usedFunction();
+    }
+}
+
+### File2.php
+
+class File2 {
+    public function usedFunction() {}
+
+    public function unusedFunctionFile2() {}
+}
+
+### JSON output
+[
+    {
+        "line": 1,
+        "message": "Unused function File1::publicUnusedFunction",
+        "rule": "unused-function",
+        "file": "File1.php"
+    }, {
+        "line": 1,
+        "message": "Unused function File1::privateUnusedFunction",
+        "rule": "unused-function",
+        "file": "File1.php"
+    }, {
+        "line": 1,
+        "message": "Unused function File2::unusedFunctionFile2",
+        "rule": "unused-function",
+        "file": "File2.php"
+    }, {
+        "line": 1,
+        "message": "Unused function File1::functionUsingFile2ButNotUsedItself",
+        "rule": "unused-function",
+        "file": "File1.php"
+    }
+]
