@@ -31,24 +31,28 @@ class File2 {
 ### JSON output
 [
     {
-        "line": 1,
+        "line": 3,
+        "name": "publicUnusedFunction",
         "message": "Unused function File1::publicUnusedFunction",
         "rule": "unused-function",
         "file": "File1.php"
     }, {
-        "line": 1,
+        "line": 4,
+        "name": "privateUnusedFunction",
         "message": "Unused function File1::privateUnusedFunction",
         "rule": "unused-function",
         "file": "File1.php"
     }, {
-        "line": 1,
-        "message": "Unused function File2::unusedFunctionFile2",
-        "rule": "unused-function",
-        "file": "File2.php"
-    }, {
-        "line": 1,
+        "line": 8,
+        "name": "functionUsingFile2ButNotUsedItself",
         "message": "Unused function File1::functionUsingFile2ButNotUsedItself",
         "rule": "unused-function",
         "file": "File1.php"
+    }, {
+        "line": 5,
+        "name": "unusedFunctionFile2",
+        "message": "Unused function File2::unusedFunctionFile2",
+        "rule": "unused-function",
+        "file": "File2.php"
     }
 ]

@@ -1,4 +1,4 @@
-The project to implement is a python CLI to detect deadcode in a codebase.
+The project aims to implement a python CLI to detect deadcode in a codebase with multiple languages supported.
 
 In the /specs folder you will find for each folders the programming language to support.
 
@@ -6,7 +6,10 @@ Inside each language folder you will find two types of files:
 
 1/ *.collector files
 
-It contains the specs for the collector to implement
+It contains the specs for the collector to implement.
+THe description of the collector to implement.
+Then there is multiples example of files that will be used to test the collector.
+And finally the expected output of the collector in JSON.
 
 2/ *.rule files
 
