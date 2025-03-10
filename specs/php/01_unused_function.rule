@@ -1,5 +1,8 @@
 ### Description
+This rule checks for unused functions in the php files bellow.
 
+### Depends on collectors
+specs/php/collectors/function.collector
 
 
 ### File1.php

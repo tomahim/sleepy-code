@@ -1,0 +1,25 @@
+The project to implement is a python CLI to detect deadcode in a codebase.
+
+In the /specs folder you will find for each folders the programming language to support.
+
+Inside each language folder you will find two types of files:
+
+1/ *.collector files
+
+It contains the specs for the collector to implement
+
+2/ *.rule files
+
+It contains the rules to detect deadcode. 
+There is first a description of what the rule is about. 
+Then it describes which collector is needed to as an input to the rule.
+Then there is multiples example of files that will be used to test the rule.
+And finally the expected output of the rule in JSON.
+
+
+The CLI command is executed with the following command: `deadcode <path> -<language/folder name in specs/> -r 01_unused_function.rule`. 
+
+By default the command will return the JSON output as stated in the *.rule file. 
+
+
+
