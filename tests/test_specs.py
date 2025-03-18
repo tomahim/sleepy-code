@@ -55,7 +55,7 @@ class TestSpecsParametrized(unittest.TestCase):
                 
                 try:
                     result = subprocess.check_output(
-                        ['deadcode', str(temp_dir), f'-{lang}', '-c', collector_file.stem, '--json'],
+                        ['deadcode', str(temp_dir), f'--{lang}', '-c', collector_file.stem, '--json'],
                         text=True
                     )
                     self.assertEqual(json.loads(result), expected_json)
@@ -78,7 +78,7 @@ class TestSpecsParametrized(unittest.TestCase):
                 
                 try:
                     result = subprocess.check_output(
-                        ['deadcode', str(temp_dir), f'-{lang}', '-r', rule_file.stem, '--json'],
+                        ['deadcode', str(temp_dir), f'--{lang}', '-r', rule_file.stem, '--json'],
                         text=True
                     )
                     self.assertEqual(json.loads(result), expected_json)

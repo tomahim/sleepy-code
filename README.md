@@ -22,3 +22,8 @@ pip install -e .
 ```bash
 deadcode --help
 ```
+
+5. Run tests:
+```bash
+python -m unittest discover tests -v
+```

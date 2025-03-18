@@ -27,4 +27,4 @@ jobs:
         
     - name: Run tests
       run: |
-        python -m unittest tests/test_specs.py -v
+        python -m unittest discover tests -v

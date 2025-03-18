@@ -26,17 +26,17 @@ class File2 {
 [
     {
         "name": "publicFn",
-        "file": "File1.php"
+        "file": "File1.php",
         "line": 3
     },
     {
         "name": "privateFn",
-        "file": "File1.php"
+        "file": "File1.php",
         "line": 5
     },
     {
         "name": "staticFunction",
-        "file": "File2.php"
+        "file": "File2.php",
         "line": 4
     }
 ]
