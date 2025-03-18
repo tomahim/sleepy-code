@@ -17,3 +17,8 @@ pip install -r requirements.txt
 ```bash
 pip install -e .
 ```
+
+4. Command usage
+```bash
+deadcode --help
+```
