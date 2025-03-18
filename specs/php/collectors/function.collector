@@ -5,7 +5,7 @@ This collector list all the functions in the php files bellow. Multiple cases:
 - static functions
 - and other function you might encounter in php codebases
 
-### File1.php
+### file:File1.php
 
 class File1 {
     public function publicFn() {
@@ -15,7 +15,7 @@ class File1 {
     }
 }
 
-### File2.php
+### file:File2.php
 
 class File2 {
     public const CONST_PUBLIC = 1;

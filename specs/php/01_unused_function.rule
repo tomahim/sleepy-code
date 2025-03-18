@@ -5,7 +5,7 @@ This rule checks for unused functions in the php files bellow.
 specs/php/collectors/function.collector
 
 
-### File1.php
+### file:File1.php
 
 class File1 {
     public function publicUnusedFunction() {
@@ -20,7 +20,7 @@ class File1 {
     }
 }
 
-### File2.php
+### file:File2.php
 
 class File2 {
     public function usedFunction() {}
