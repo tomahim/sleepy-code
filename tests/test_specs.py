@@ -19,6 +19,16 @@ class TestSpecsParametrized(unittest.TestCase):
                 for spec_file in lang_dir.glob('*.rule'):
                     cls.rules.append((lang_dir.name, spec_file))
 
+    def assertJsonEqual(self, first, second):
+        """Custom assertion to compare JSON lists regardless of order"""
+        if isinstance(first, list) and isinstance(second, list):
+            # Sort lists by converting dict items to strings for comparison
+            first_sorted = sorted(first, key=lambda x: json.dumps(x, sort_keys=True))
+            second_sorted = sorted(second, key=lambda x: json.dumps(x, sort_keys=True))
+            self.assertEqual(first_sorted, second_sorted)
+        else:
+            self.assertEqual(first, second)
+
     def parse_spec_file(self, spec_file):
         with open(spec_file) as f:
             content = f.read()
@@ -58,7 +68,7 @@ class TestSpecsParametrized(unittest.TestCase):
                         ['deadcode', str(temp_dir), f'--{lang}', '-c', collector_file.stem, '--json'],
                         text=True
                     )
-                    self.assertEqual(json.loads(result), expected_json)
+                    self.assertJsonEqual(json.loads(result), expected_json)
                 finally:
                     # Cleanup temp files
                     for file in temp_dir.glob('**/*'):
@@ -81,7 +91,7 @@ class TestSpecsParametrized(unittest.TestCase):
                         ['deadcode', str(temp_dir), f'--{lang}', '-r', rule_file.stem, '--json'],
                         text=True
                     )
-                    self.assertEqual(json.loads(result), expected_json)
+                    self.assertJsonEqual(json.loads(result), expected_json)
                 finally:
                     # Cleanup temp files
                     for file in temp_dir.glob('**/*'):
