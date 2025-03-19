@@ -64,11 +64,11 @@ class TestSpecsParametrized(unittest.TestCase):
                 self.create_temp_files(files, temp_dir)
                 
                 try:
-                    result = subprocess.check_output(
+                    result = json.loads(subprocess.check_output(
                         ['deadcode', str(temp_dir), f'--{lang}', '-c', collector_file.stem, '--json'],
                         text=True
-                    )
-                    self.assertJsonEqual(json.loads(result), expected_json)
+                    ))
+                    self.assertJsonEqual(result, expected_json)
                 finally:
                     # Cleanup temp files
                     for file in temp_dir.glob('**/*'):

@@ -19,7 +19,7 @@ class File1 {
 
 class File2 {
     public const CONST_PUBLIC = 1;
-    public static staticFunction() {}
+    public static function staticFunction() {}
 }
 
 ### JSON output
@@ -32,7 +32,7 @@ class File2 {
     {
         "name": "privateFn",
         "file": "File1.php",
-        "line": 5
+        "line": 6
     },
     {
         "name": "staticFunction",
